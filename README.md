@@ -1,415 +1,385 @@
 # PROMETHEUS // Quantum Execution Intelligence
 
-**Hardware-aware quantum execution intelligence for evaluating, selecting, and dispatching quantum workloads across compilers and heterogeneous QPUs.**
+**Hardware-aware quantum compilation and execution intelligence for generating, evaluating, selecting, and dispatching physical quantum executions across heterogeneous QPUs.**
 
-Prometheus sits above the compilation layer and evaluates how a workload should actually execute on available quantum hardware.
+Prometheus is both a **quantum compiler** and a **hardware-aware execution-intelligence system**.
 
-Instead of treating a single compiler output as the final answer, Prometheus can evaluate multiple valid execution candidates, characterize the hardware environment, compare execution trajectories, and select the candidate and physical execution environment most appropriate for the workload.
+The Prometheus compiler performs circuit compilation, physical mapping, and routing while incorporating information about the target hardware into the optimization process. Prometheus can also evaluate alternative compiler outputs—including **SABRE O3** and **TKET**—as competing execution candidates.
 
----
+The result is an execution architecture in which compilation and execution selection are treated as related, but distinct, problems:
 
-## The Problem
-
-Quantum compilers are extremely good at producing valid physical circuits.
-
-But a valid circuit is not necessarily the best circuit to execute on a real QPU.
-
-Physical processors are heterogeneous.
-
-Gate errors, readout behavior, connectivity, calibration conditions, local hardware quality, and short-timescale variation can differ substantially across a processor.
-
-The same logical workload can therefore produce different execution quality depending on:
-
-- which compiler generated the circuit;
-- which routing strategy was used;
-- which physical qubits were selected;
-- which QPU receives the workload;
-- and the hardware state at execution time.
-
-Prometheus is designed to make that decision explicitly.
+> **Generate a physical circuit. Understand the hardware. Select the execution. Dispatch it to the QPU. Measure what happened.**
 
 ---
 
-# What Prometheus Does
+## What is Prometheus?
 
-Prometheus provides a hardware-aware execution layer between quantum workloads and quantum processors.
+Prometheus is being developed as a hardware-aware quantum compiler and execution layer for heterogeneous quantum computing environments.
+
+Unlike a workflow in which one compiler output is automatically treated as the final answer, Prometheus can consider multiple physical realizations and evaluate them against the environment in which they will execute.
 
 At a high level:
 
-    Quantum Workload
-           │
-           ▼
-    Candidate Generation
-           │
-           ├──────────────┐
-           │              │
-           ▼              ▼
-       SABRE O3          TKET
-           │              │
-           └──────┬───────┘
-                  │
-                  ▼
-        Execution Candidates
-                  │
-                  ▼
-       Current Hardware State
-                  │
-                  ▼
-       Hardware-Aware Evaluation
-                  │
-                  ▼
-        Execution Selection
-                  │
-                  ▼
-          QPU Selection
-                  │
-                  ▼
-             Job Dispatch
-                  │
-                  ▼
-        Observed Execution
-                  │
-                  ▼
-       Telemetry / Drift Data
+```text
+                         Quantum Workload
+                                │
+                                ▼
+                   ┌─────────────────────────┐
+                   │ Candidate Generation    │
+                   │                         │
+                   │ Prometheus Compiler     │
+                   │ SABRE O3 / Qiskit       │
+                   │ TKET                    │
+                   │ Other candidates        │
+                   └────────────┬────────────┘
+                                │
+                     Physical execution candidates
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                    ▼                       ▼
+             Hardware State          QPU Capabilities
+                    │                       │
+                    └───────────┬───────────┘
+                                ▼
+                   Hardware-Aware Evaluation
+                                │
+                                ▼
+                    Execution Intelligence
+                                │
+                                ▼
+                    Compiler / Circuit / QPU
+                           Selection
+                                │
+                                ▼
+                           Job Dispatch
+                                │
+                                ▼
+                       Observed Execution
+                                │
+                                ▼
+                    Execution / Drift Telemetry
+```
 
-The key distinction is:
-
-**Compilation generates candidates. Prometheus evaluates which candidate should actually execute.**
-
----
-
-# Multi-Compiler Execution
-
-Prometheus is designed to be compiler-agnostic.
-
-Current candidate-generation integrations include:
-
-- **SABRE O3 / Qiskit**
-- **TKET**
-- Prometheus hardware-aware candidate generation and optimization
-- additional compilation strategies as the system expands
-
-Rather than replacing existing compiler infrastructure, Prometheus can treat compiler outputs as alternative execution candidates.
-
-This allows different compilation strategies to be evaluated against the same hardware conditions and workload.
-
-The question becomes:
-
-> **Which valid execution should actually reach the QPU?**
+The key distinction is between **compiling a workload** and **deciding which physical execution should actually reach the hardware**.
 
 ---
 
-# Hardware-Aware Execution
+# Prometheus is a compiler
 
-Prometheus evaluates execution candidates against physical hardware information rather than relying solely on abstract circuit cost.
+Prometheus is not only a supervisory layer.
 
-The system can incorporate hardware characteristics including:
+Its own compiler generates physical circuit implementations and was responsible for the experimental executions documented in the separate **[Prometheus Quantum Telemetry](https://github.com/PrometheusDynamicsCanada/prometheus-quantum-telemetry)** repository.
+
+The telemetry repository contains the experimental record supporting the development and evaluation of the Prometheus compiler across real quantum hardware.
+
+Prometheus can therefore be used in two complementary ways:
+
+### 1. Prometheus Compiler
+
+Generate a hardware-aware physical realization directly.
+
+### 2. Multi-Compiler Execution Intelligence
+
+Evaluate physical candidates generated by Prometheus, SABRE O3, TKET, and other compilation strategies, then determine which candidate is appropriate for the target hardware and workload.
+
+This allows Prometheus to function as both a **compiler** and an **execution decision layer**.
+
+---
+
+# Hardware awareness
+
+Quantum processors are not uniform execution surfaces.
+
+Physical qubits and couplers can exhibit different error characteristics, readout behavior, connectivity constraints, and calibration conditions. A routing decision that looks favorable from circuit structure alone may therefore not correspond to the best measured execution.
+
+Prometheus incorporates hardware information into the compilation and execution-selection process.
+
+Depending on the experiment and available hardware data, evaluation can include:
 
 - two-qubit gate error;
 - readout error;
 - physical connectivity;
 - qubit availability;
 - local hardware quality;
-- calibration state;
-- execution conditions;
-- circuit structure;
+- calibration information;
 - routing overhead;
+- physical circuit depth;
+- physical two-qubit gate count;
 - measured execution outcomes.
 
-The objective is not simply to minimize gate count.
-
-The objective is to identify an execution that is appropriate for the physical environment in which it will run.
+The objective is not to assume that one metric is sufficient for every workload.
 
 ---
 
-# Multi-QPU Arbitration
+# Multi-compiler execution
 
-Prometheus can evaluate workloads across multiple operational QPUs.
+Prometheus is designed to work alongside existing quantum compilation infrastructure.
 
-This enables workload-specific processor selection rather than relying exclusively on a permanent global ranking of available machines.
+Current compiler/candidate integrations include:
 
-A workload can therefore be evaluated against:
+- **Prometheus compiler**
+- **SABRE O3 / Qiskit**
+- **TKET**
 
-**Workload → Compiler → Physical Mapping → QPU**
+These systems can produce different valid physical realizations of the same logical workload.
 
-rather than:
+Prometheus can then evaluate those alternatives against the hardware environment rather than assuming that the output of any one compiler is automatically the final execution choice.
 
-**Workload → Default Compiler → Default QPU**
+This creates a practical model:
 
-This creates the foundation for execution-aware quantum fleet management.
+```text
+Logical workload
+      │
+      ├── Prometheus
+      ├── SABRE O3
+      └── TKET
+            │
+            ▼
+    Multiple valid physical circuits
+            │
+            ▼
+    Hardware-aware evaluation
+            │
+            ▼
+      Execution selection
+            │
+            ▼
+          QPU job
+```
+
+The purpose is not simply to replace one compiler with another.
+
+It is to make **compiler choice and physical execution choice measurable decisions**.
 
 ---
 
-# Current Demonstrated System
+# Multi-QPU execution intelligence
 
-The current system provides an operational environment for:
+Prometheus can evaluate workloads against individual QPUs as well as across a fleet of available processors.
 
-- quantum workload configuration;
-- IBM Quantum processor discovery;
-- hardware characterization;
-- SABRE O3 candidate generation;
-- TKET candidate generation;
-- multi-compiler comparison;
-- hardware-aware execution evaluation;
-- physical candidate selection;
-- cross-QPU arbitration;
-- real hardware dispatch;
-- comparative execution;
-- execution telemetry;
-- result inspection;
-- hardware/run variability observation.
+This supports workload-specific QPU selection rather than relying exclusively on a permanent global ranking of devices.
+
+Conceptually:
+
+```text
+             Workload
+                 │
+                 ▼
+        Candidate generation
+                 │
+        ┌────────┼────────┐
+        ▼        ▼        ▼
+      QPU A    QPU B    QPU C
+        │        │        │
+        └────────┼────────┘
+                 ▼
+       Hardware-aware evaluation
+                 │
+                 ▼
+          Execution selection
+                 │
+                 ▼
+              Dispatch
+```
+
+The same logical workload does not have to be permanently tied to one compiler, one physical region, or one QPU.
 
 ---
 
-# Comparative Execution
+# Real hardware experimentation
 
-Prometheus can compare execution candidates using measured and hardware-aware indicators including:
+Prometheus has been experimentally developed and evaluated on real IBM Quantum hardware, including IBM Heron processors.
+
+A representative **9-qubit dense all-to-all IBM Marrakesh** comparison documented in this repository reports:
+
+| Pipeline | 2Q gates | Physical depth | Measured state fidelity |
+|---|---:|---:|---:|
+| SABRE O3 | 90 | 145 | 0.5738 |
+| TKET | 123 | 165 | 0.5248 |
+| **PROMETHEUS** | **74** | **109** | **0.7466** |
+
+The comparison used the same hardware, workload, and SamplerV2 job.
+
+The IBM job identifier for that execution is:
+
+`dadl5jd1ierc738l1420`
+
+These are representative experimental results, not a claim of universal superiority across every workload, device, or calibration state.
+
+---
+
+# Prometheus Quantum Telemetry
+
+The experimental research record is maintained separately in:
+
+**[PrometheusDynamicsCanada/prometheus-quantum-telemetry](https://github.com/PrometheusDynamicsCanada/prometheus-quantum-telemetry)**
+
+That repository documents the real-hardware experiments used to investigate hardware-aware compilation and execution behavior, including comparative compiler studies and workload-dependent results.
+
+The Prometheus compiler was used to produce the Prometheus physical executions represented in that research record.
+
+The telemetry project is intentionally structured as an experimental record rather than a public release of the protected Prometheus implementation.
+
+---
+
+# Demonstrated execution metrics
+
+Depending on the experiment, Prometheus can compare physical executions using measurements such as:
 
 - State Fidelity
+- Hellinger Fidelity
 - Heavy Output Probability (HOP)
 - Total Variation Distance (TVD)
 - Cross-Entropy / XEB
-- two-qubit gate count
+- Shannon entropy
 - physical circuit depth
+- physical two-qubit gate count
 - routing overhead
 - hardware-weighted execution cost
 - hardware allocation
 - output-state distributions
-- execution metadata
 
-The system can retain a baseline execution when an alternative does not provide a sufficiently favorable outcome.
-
-Prometheus does not need to intervene simply because an alternative exists.
+The appropriate metric depends on the workload and experimental objective. Prometheus does not assume that circuit depth, gate count, or any single global hardware statistic completely describes execution quality.
 
 ---
 
-# Real Hardware
+# Research direction
 
-Prometheus has been developed and tested using real IBM Quantum hardware.
+The current system is being developed toward a broader **multi-compiler, multi-QPU execution-intelligence platform**.
 
-Representative work includes IBM Heron processors and comparative execution across multiple workloads and hardware conditions.
+The direction includes:
 
-A representative IBM Marrakesh execution demonstrated:
-
-- **43.02% displayed execution-cost reduction**
-- State Fidelity: **0.6815 → 0.7004**
-- Heavy Output Probability: **0.8289 → 0.8440**
-- TVD: **0.3528 → 0.3308**
-- XEB: **11.4691 → 13.0769**
-
-These values are representative experimental observations, not a universal performance guarantee.
-
----
-
-# Why This Matters
-
-Traditional compilation asks:
-
-> **How do I produce a valid circuit for this QPU?**
-
-Prometheus asks:
-
-> **Which valid physical execution is most appropriate for this workload, this hardware, and this execution environment?**
-
-That distinction becomes increasingly important as quantum processors become larger, more heterogeneous, and more numerous.
-
-A quantum workload should not necessarily be permanently tied to:
-
-- one compiler;
-- one routing strategy;
-- one physical region;
-- or one QPU.
-
-Prometheus is designed to provide the decision layer between those components.
-
----
-
-# Architecture
-
-The system separates four major responsibilities:
-
-### 1. Candidate Generation
-
-Existing compilers and routing systems produce valid physical execution candidates.
-
-Current integrations include:
-
-- SABRE O3 / Qiskit
-- TKET
-- Prometheus optimization
-
-### 2. Hardware Characterization
-
-Prometheus gathers information about the current physical execution environment.
-
-### 3. Execution Arbitration
-
-Candidate executions are evaluated against the hardware environment and workload requirements.
-
-The proprietary execution-selection mechanism is not disclosed in this repository.
-
-### 4. Dispatch
-
-The selected execution candidate and QPU are dispatched for real execution.
-
-Observed results can then be retained as execution telemetry and used to study hardware/run variation.
-
----
-
-# Prometheus Is Not a Replacement for SABRE or TKET
-
-Prometheus does not need to replace existing compilation infrastructure.
-
-SABRE, TKET, Qiskit, and other compilation systems can remain responsible for generating high-quality physical circuit candidates.
-
-Prometheus operates at a different layer.
-
-Their outputs become candidates.
-
-**Prometheus decides which candidate should execute.**
-
-This creates a compiler-agnostic execution architecture in which multiple compilation strategies can compete against the same physical hardware conditions.
-
----
-
-# Research Direction
-
-The longer-term objective is a multi-compiler, multi-QPU execution-intelligence and dispatch layer.
-
-The architecture is intended to expand across:
-
-- additional compilation frameworks;
+- stronger Prometheus compiler capabilities;
+- broader compiler integration;
 - additional IBM Quantum processors;
-- Quantinuum;
-- IonQ;
-- other quantum providers;
-- superconducting processors;
-- trapped-ion processors;
-- other emerging quantum processor architectures.
+- fleet-level workload scheduling;
+- additional quantum hardware providers;
+- cross-architecture execution evaluation;
+- continuous hardware/run telemetry;
+- execution-aware dispatch.
 
-The underlying abstraction is intentionally broader than any single compiler or hardware technology.
-
----
-
-# Practical Applications
-
-Prometheus can provide infrastructure for:
-
-### Quantum Fleet Management
-
-Workload-specific QPU selection and execution-aware dispatch.
-
-### Compiler Enhancement
-
-Evaluate multiple compiler trajectories without replacing existing compilation infrastructure.
-
-### Hardware-Aware Compilation
-
-Select physical executions according to the hardware environment rather than topology alone.
-
-### Multi-Vendor Execution
-
-Provide a common execution-arbitration abstraction across different quantum processor technologies.
-
-### Enterprise Quantum Workloads
-
-Add execution selection, dispatch, execution history, and hardware/run observation between applications and quantum processors.
-
-### Quantum Benchmarking
-
-Compare compiler strategies, QPUs, workloads, calibration states, routing strategies, and observed execution quality.
+The architecture is intentionally broader than any single compiler or hardware provider.
 
 ---
 
-# Public Disclosure
+# Current operating envelope
 
-This repository is a public capability record and architectural demonstration.
+Prometheus is an experimental system, and its behavior is workload- and hardware-dependent.
+
+The Prometheus compiler is currently strongest in lower-qubit-count regimes where hardware-aware physical search and optimization can be applied effectively. As circuit size increases, search complexity and routing cost become increasingly important parts of the operating envelope.
+
+The purpose of the research program is therefore not to claim that Prometheus wins every workload.
+
+The purpose is to determine **when hardware-aware compilation and execution selection provide a measurable advantage, when they do not, and where the crossover occurs**.
+
+Neutral and unfavorable results are part of that process.
+
+---
+
+# What Prometheus changes
+
+A conventional workflow can look like:
+
+```text
+Workload
+   ↓
+Compiler
+   ↓
+Physical circuit
+   ↓
+QPU
+```
+
+Prometheus expands this into:
+
+```text
+Workload
+   ↓
+Multiple compilation strategies
+   ↓
+Physical execution candidates
+   ↓
+Hardware characterization
+   ↓
+Hardware-aware evaluation
+   ↓
+Execution selection
+   ↓
+QPU selection
+   ↓
+Dispatch
+   ↓
+Measured execution
+   ↓
+Telemetry
+```
+
+The difference is simple:
+
+> **Compilation does not have to be the end of the decision process.**
+
+---
+
+# Public disclosure boundary
+
+This repository is a public capability and architecture record, not a release of the protected Prometheus implementation.
 
 ### Public
 
-- system workflow;
-- architecture;
-- interface screenshots;
-- compiler integration concepts;
-- representative execution outcomes;
-- hardware observations;
+- system architecture;
+- compiler/execution workflow;
+- integration concepts;
+- representative experimental outcomes;
+- real-hardware observations;
 - research direction;
-- demonstration results.
+- demonstration material.
 
 ### Controlled
 
 - proprietary implementation;
 - proprietary equations and derivations;
-- feature construction;
+- internal feature construction;
 - internal weights and coefficients;
-- internal ranking;
-- detailed selection heuristics;
+- proprietary ranking and selection logic;
+- detailed optimization heuristics;
 - private infrastructure.
 
-The repository intentionally does not contain the complete chain required to reconstruct the proprietary execution-selection mechanism.
+The public repository intentionally does not contain the complete chain required to reconstruct the proprietary Prometheus optimization and execution-selection mechanism.
 
 ---
 
-# Important Scope
+# Scope and interpretation
 
-Prometheus does **not** claim:
+Prometheus should not be interpreted as:
 
-- universal superiority over every compiler;
-- improved fidelity on every workload;
-- a universal optimum across all QPUs;
-- that routing cost is irrelevant;
-- that one compiler should always be selected;
-- that every planned hardware integration is currently operational.
+- a guarantee of improved fidelity on every workload;
+- a claim that SABRE, TKET, or any other compiler is universally inferior;
+- a claim that routing cost is irrelevant;
+- a claim that one QPU is always optimal;
+- a claim of a universal compiler or execution optimum;
+- a claim that every planned vendor integration is already operational.
 
-The purpose of the system is to make execution decisions based on measured and modeled hardware conditions and to validate those decisions experimentally.
-
-Neutral and unfavorable outcomes are valuable because they define the operating envelope of the system.
+The research is intended to establish an empirical operating envelope for hardware-aware quantum compilation and execution intelligence.
 
 ---
 
-# Core Concept
+# Repository guide
 
-Prometheus turns quantum execution into a decision problem.
-
-Instead of:
-
-    Workload
-       ↓
-    Compiler
-       ↓
-    QPU
-
-Prometheus enables:
-
-    Workload
-       ↓
-    Multiple Candidates
-       ↓
-    Hardware Characterization
-       ↓
-    Execution Intelligence
-       ↓
-    Compiler / Circuit / QPU Selection
-       ↓
-    Dispatch
-       ↓
-    Measured Execution
-       ↓
-    Telemetry
-
-**Generate multiple valid possibilities.**
-
-**Understand the hardware.**
-
-**Select the execution.**
-
-**Measure what happened.**
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — high-level system architecture.
+- **[PROJECT_DIRECTION.md](PROJECT_DIRECTION.md)** — development direction and broader system goals.
+- **[PUBLIC_DISCLOSURE.md](PUBLIC_DISCLOSURE.md)** — public/protected boundary.
+- **[SCREENSHOT_GALLERY.md](SCREENSHOT_GALLERY.md)** — interface and demonstration screenshots.
+- **[results/](results/)** — representative results and supporting material.
+- **[demonstrations/](demonstrations/)** — demonstration artifacts.
+- **[screenshots/](screenshots/)** — visual record.
+- **[Prometheus Quantum Telemetry](https://github.com/PrometheusDynamicsCanada/prometheus-quantum-telemetry)** — experimental real-hardware research record produced with the Prometheus compiler.
 
 ---
 
-## Prometheus Dynamics
+# Prometheus Dynamics
 
-Prometheus is being developed as a quantum execution-intelligence layer for hardware-aware compilation, routing, QPU selection, and execution.
+Prometheus Dynamics is developing Prometheus as a hardware-aware quantum compiler and execution-intelligence platform for compiling, evaluating, selecting, and dispatching quantum workloads across heterogeneous quantum processors.
 
 **Website:** https://prometheusdynamics.ca
 
